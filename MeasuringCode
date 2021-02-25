@@ -1,0 +1,172 @@
+#include <Arduino.h>
+#include <MAX30105.h>
+#include <heartRate.h>
+#include <FirebaseESP8266.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <Wire.h>
+ 
+// Define ESP8266 pins
+#define OLED_RESET LED_BUILTIN
+#define D0 16
+#define D3 0
+#define D4 2
+#define D5 14
+#define D6 12
+#define D7 13
+#define D8 15
+
+// Define WiFi SSID, WiFi password, Firebase host and authenticator
+#define FIREBASE_HOST "" 
+#define FIREBASE_AUTH "" 
+#define WIFI_SSID "" 
+#define WIFI_PASSWORD "" 
+
+const byte RATE_SIZE = 4; //Increase this for more averaging. 4 is good.
+byte rates[RATE_SIZE]; //Array of heart rates
+byte rateSpot = 0;
+long lastBeat = 0; //Time at which the last beat occurred
+float beatsPerMinute;
+int beatAvg;
+int measuringTime = 5000;
+unsigned long previousTime = 0;
+
+enum sensor_status {activated, deactivated};
+
+FirebaseData sensor;
+FirebaseData button;
+FirebaseJson json;
+
+MAX30105 particleSensor;
+
+void connect_to_WiFi(){
+  // connect to wifi. 
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD); 
+  Serial.print("connecting"); 
+  while (WiFi.status() != WL_CONNECTED) { 
+    Serial.print("."); 
+    delay(500); 
+  } 
+  Serial.println(); 
+  Serial.print("connected: "); 
+  Serial.println(WiFi.localIP()); 
+}
+
+void connect_to_Firebase(){
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  String status = "deactivated";
+  Firebase.setString(button, "/Button status/Status", status);
+  Firebase.reconnectWiFi(true);
+  
+}
+
+// Calculate average heartbeat
+// This part of the code is taken from SparkFun_MAX3010x_Sensor_Library Example5_HeartRate.
+int updateHR(){
+  
+  long irValue = particleSensor.getIR();
+  auto isItBeat = checkForBeat(irValue);
+
+  if (isItBeat == true)
+  {
+    //We sensed a beat!
+    long delta = millis() - lastBeat;
+    lastBeat = millis();
+
+    beatsPerMinute = 60 / (delta / 1000.0);
+    
+    if (beatsPerMinute < 255 && beatsPerMinute > 20)
+    {
+      rates[rateSpot++] = (byte)beatsPerMinute; //Store this reading in the array
+      rateSpot %= RATE_SIZE; //Wrap variable 
+
+    //Take average of readings
+    beatAvg = 0;
+    for (byte x = 0 ; x < RATE_SIZE ; x++)
+      beatAvg += rates[x];
+    beatAvg /= RATE_SIZE;
+    
+    }
+  }
+  
+  return beatAvg; 
+}
+
+// Update Firebase after average heartbeat has been calculated. 
+void update_Firebase(int HRvalue){
+  Firebase.setInt(sensor, "/HR value/Value", HRvalue);
+}
+
+// Check if the user has clicked "Start" or "Stop" button.
+sensor_status check_button_status(){
+  if (Firebase.getString(button, "/Button status/Status")){
+    if (button.stringData() == "deactivated"){
+      return deactivated;
+    }
+
+    else if(button.stringData() == "activated"){
+      return activated;
+    }
+  }
+  delay(100);
+}
+
+// When "Start" button is pressed --> activate sensor. 
+void Initialize_sensor(int val){
+
+  // MAX3012 sensor settings
+  byte ledBrightness = val; //Options: 0=Off to 255=50mA
+  byte sampleAverage = 8; //Options: 1, 2, 4, 8, 16, 32 // 8
+  byte ledMode = 2; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
+  int sampleRate = 400; //Options: 50, 100, 200, 400, 800, 1000 //400
+  int pulseWidth = 411; //Options: 69, 118, 215, 411 // 411
+  int adcRange = 4096; //Options: 2048, 4096, 8192, 16384
+
+  // Initialize sensor
+  particleSensor.begin(Wire, I2C_SPEED_FAST); //Use default I2C port, 400kHz speed
+  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  connect_to_WiFi();
+  connect_to_Firebase();
+
+}
+
+void loop ()
+{
+  // Check if the "start" button is pushed
+  sensor_status status = check_button_status();
+  if (status == deactivated){
+    int val = 0x0;
+    Initialize_sensor(val);
+    delay(1000);
+    return;
+  }
+
+  if (status == activated){
+    delay(500);
+    
+    // Start the sensor
+    int val = 0x1F;
+    Initialize_sensor(val);
+
+    while (status == activated){
+
+      int HRvalue = updateHR();
+      Serial.println(HRvalue);
+      
+      unsigned long currentTime = millis();
+  
+      if ((unsigned long)(currentTime - previousTime) >= measuringTime)// Update HR value based on value of measuringTime. 
+      {
+        update_Firebase(HRvalue);
+        status = check_button_status();
+        previousTime = currentTime;
+      }
+    }
+    return loop();
+  }
+}
