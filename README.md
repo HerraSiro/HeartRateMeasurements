@@ -23,6 +23,6 @@ https://code.visualstudio.com/
 
 **Graphical User Interface (GUI):** User can choose from two options: MEASURE HEARBEAT and MEASURE TEMPERATURE. The temperature measurement is an extension of this project. When MEASURE HEARTBEAT icon is clicked, new window is opened. There user can start and stop measurement whenever he/she wants. Current measurement result is displayed inside the white box.
 
-![Main Window](C:\Users\siroa\OneDrive\Desktop\Main window.png)
+![Main Window](\Main window.png)
 
 
