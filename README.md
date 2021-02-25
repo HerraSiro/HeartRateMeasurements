@@ -19,3 +19,7 @@ https://developer.android.com/
 Visual Studio Code code editor was used as a code platform. 
 https://code.visualstudio.com/
 
+**Measurement system:** The MAX30102 module is connected to ESP8266 module directly with jump wires. Each measurement last for 5 seconds (Measuring time can be easily modified if necessary.) and after that measuring result is uploaded to the Google Firebase with Wi-Fi connection. 
+
+**Graphical User Interface (GUI):** User can choose from two options: Heart rate and Temperature. The temperature measurement is an extension of this project. When HEART RATE icon is clicked, new window is opened. There user can start and stop measurement whenever he/she wants. Current measurement result is displayed inside the white box.
+
