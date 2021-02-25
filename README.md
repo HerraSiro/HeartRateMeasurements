@@ -1,4 +1,4 @@
-#**Average Heart Rate Measurements**
+#Average Heart Rate Measurements
 
 Purpose of this project was to create a simple heart rate measuring system and an Android app that will display the average heart rate in real time.
 
