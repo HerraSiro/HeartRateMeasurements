@@ -3,6 +3,7 @@
 Purpose of this project was to create a simple heart rate measuring system and an Android app that will display the average heart rate in real time.
 
 Used materials:
+
 For the heart rate measurements, MAX30102 sensor module was used. 
 https://www.maximintegrated.com/en/products/interface/sensor-interface/MAX30102.html
 
